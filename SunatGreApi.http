@@ -1,0 +1,6 @@
+@SunatGreApi_HostAddress = http://localhost:5133
+
+GET {{SunatGreApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

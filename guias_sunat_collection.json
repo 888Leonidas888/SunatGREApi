@@ -1,0 +1,89 @@
+{
+	"info": {
+		"_postman_id": "8c4d2e7a-3f1b-4d5c-9a1d-7e8f9a0b1c2d",
+		"name": "Guías SUNAT API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Crear Guía",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": \"GUI-123456789\",\n    \"serie\": \"T001\",\n    \"numero\": \"00000001\",\n    \"rucEmisor\": \"20123456789\",\n    \"tipoDocumento\": \"09\",\n    \"fechaEmision\": \"2024-02-15T10:00:00\",\n    \"receptor\": \"CLIENTE EJEMPLO SAC\",\n    \"xmlPath\": \"C:/descargas/T001-00000001.xml\",\n    \"estado\": \"ACEPTADA\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:5000/api/Guia",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"Guia"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Listar Guías Paginado",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5000/api/Guia?page=1&pageSize=10",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"Guia"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "pageSize",
+							"value": "10"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Guía por ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5000/api/Guia/GUI-123456789",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"Guia",
+						"GUI-123456789"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
