@@ -39,5 +39,8 @@ namespace SunatGreApi.Models
         public string? NumContenedor { get; set; }
         public string? NumPrecinto { get; set; }
         public string? IndContenedorVacio { get; set; }
+        public string? Partida { get; set; } = string.Empty;
+        public double? PesoBruto { get; set; } = 0;
+        public int? Rollos { get; set; } = 0;
     }
 }

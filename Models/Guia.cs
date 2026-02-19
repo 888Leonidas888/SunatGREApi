@@ -35,8 +35,16 @@ namespace SunatGreApi.Models
 
         public DateTime FechaCarga { get; set; } = DateTime.Now;
 
-        public List<GuiaBien> Bienes { get; set; } = new();
-
         public string? Nota { get; set; } = string.Empty;
+
+        public string? OrdenCompra { get; set; } = string.Empty;
+
+        public string? CodigoClaseOrden { get; set; } = string.Empty;
+
+        public string? CodigoProveedor { get; set; } = string.Empty;
+
+        public string? TipoMovimiento { get; set; } = string.Empty;
+
+        public List<GuiaBien> Bienes { get; set; } = new();
     }
 }
