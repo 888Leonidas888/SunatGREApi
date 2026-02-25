@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SunatGreApi.Data;
 using SunatGreApi.Models;
+using SunatGreApi.Utils;
 
 namespace SunatGreApi.Controllers
 {
@@ -97,7 +98,8 @@ namespace SunatGreApi.Controllers
                     NumDetalle = b.NumDetalle,
                     NumContenedor = b.NumContenedor,
                     NumPrecinto = b.NumPrecinto,
-                    IndContenedorVacio = b.IndContenedorVacio
+                    IndContenedorVacio = b.IndContenedorVacio,
+                    Partida = GetPartida(b.DesBien)
                 }).ToList()
             };
 

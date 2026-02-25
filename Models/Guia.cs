@@ -45,6 +45,8 @@ namespace SunatGreApi.Models
 
         public string? TipoMovimiento { get; set; } = string.Empty;
 
+        public string? CodigoCentroCosto { get; set; } = string.Empty;
+
         public List<GuiaBien> Bienes { get; set; } = new();
     }
 }

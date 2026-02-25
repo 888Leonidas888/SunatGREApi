@@ -42,5 +42,6 @@ namespace SunatGreApi.Models
         public string? Partida { get; set; } = string.Empty;
         public double? PesoBruto { get; set; } = 0;
         public int? Rollos { get; set; } = 0;
+        public string? CodigoTela { get; set; } = string.Empty;
     }
 }
