@@ -74,6 +74,7 @@ namespace SunatGreApi.Controllers
                 Estado = dto.DesEstado,
                 FechaCarga = DateTime.Now,
                 Nota = dto.Emision.DesNota,
+                // OrdenCompra = SunatHelper.GetOrdenCompra(dto.Emision.DesNota),
                 Bienes = dto.Traslado.Bien.Select(b => new GuiaBien
                 {
                     GuiaId = dto.Id,
@@ -99,7 +100,9 @@ namespace SunatGreApi.Controllers
                     NumContenedor = b.NumContenedor,
                     NumPrecinto = b.NumPrecinto,
                     IndContenedorVacio = b.IndContenedorVacio,
-                    Partida = GetPartida(b.DesBien)
+                    Partida = SunatHelper.GetPartida(b.DesBien ?? string.Empty),
+                    Rollos = SunatHelper.GetRollos(b.DesBien ?? string.Empty),
+                    PesoBruto = SunatHelper.GetPesoBruto(b.DesBien ?? string.Empty)
                 }).ToList()
             };
 

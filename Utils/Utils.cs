@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace SunatGreApi.Utils
 {
-    public static class Utils
+    public static class SunatHelper
     {
         public static string GetPatron(string texto, string pattron)
         {
@@ -15,7 +15,8 @@ namespace SunatGreApi.Utils
         }
         public static string GetPartida(string texto)
         {
-            string pattron = @"[A-Za-z]{1}[0-9]{4}"; //Ejemplo: B8466
+            // Buscamos patrones como B8175, B9525, etc. 
+            string pattron = @"\b[A-Za-z]\d{4}\b"; 
             return GetPatron(texto, pattron);
         }
 
@@ -27,6 +28,7 @@ namespace SunatGreApi.Utils
 
         public static int GetRollos(string texto)
         {
+            // Buscamos "Rollos: 123" o "Rollos: 123" o "Rollos 123"
             var patron = @"\brollos?\b\s*:\s*(\d+)";
             var m = Regex.Match(texto, patron, RegexOptions.IgnoreCase);
 
@@ -37,6 +39,19 @@ namespace SunatGreApi.Utils
             }
             return 0;
         }
-    }
 
+        public static double GetPesoBruto(string texto)
+        {
+            // Buscamos "P.Bruto : 1712.550"
+            var patron = @"\bP\.Bruto\b[:\s]+([\d.]+)";
+            var m = Regex.Match(texto, patron, RegexOptions.IgnoreCase);
+
+            if (m.Success)
+            {
+                if (double.TryParse(m.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double peso))
+                    return peso;
+            }
+            return 0;
+        }
+    }
 }
