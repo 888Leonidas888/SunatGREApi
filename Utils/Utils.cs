@@ -42,13 +42,16 @@ namespace SunatGreApi.Utils
 
         public static double GetPesoBruto(string texto)
         {
-            // Buscamos "P.Bruto : 1712.550"
-            var patron = @"\bP\.Bruto\b[:\s]+([\d.]+)";
-            var m = Regex.Match(texto, patron, RegexOptions.IgnoreCase);
+            // var patron = @"\bP\.Bruto\b[:\s]+([\d.]+)";
+            var patron = @"\b(?:PB|P\.?Bruto)\s*:?\s*([0-9]+(?:[.,][0-9]+)?)";
+            Match m = Regex.Match(texto, patron, RegexOptions.IgnoreCase);
 
             if (m.Success)
             {
-                if (double.TryParse(m.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double peso))
+                var valor = m.Groups[1].Value.Replace(',', '.'); // Normaliza coma a punto
+                //Console.WriteLine(valor);
+
+                if (double.TryParse(valor, NumberStyles.Any, CultureInfo.InvariantCulture, out double peso))
                     return peso;
             }
             return 0;
