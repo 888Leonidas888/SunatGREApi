@@ -12,8 +12,10 @@ namespace SunatGreApi.Repositories
             _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         }
 
-        public async Task<(string nombreComercial, string codigoTela, string ordenCompra, string codigoProveedor)> GetDetalleBienAsync(string partida)
+        public async Task<List<(string nombreComercial, string codigoTela, string ordenCompra, string codigoProveedor)>> GetDetalleBienListAsync(string partida)
         {
+            var results = new List<(string, string, string, string)>();
+
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync();
 
@@ -22,17 +24,17 @@ namespace SunatGreApi.Repositories
             command.Parameters.AddWithValue("@cod_ordtra", partida);
 
             using var reader = await command.ExecuteReaderAsync();
-            if (await reader.ReadAsync())
+            while (await reader.ReadAsync())
             {
-                return (
+                results.Add((
                     reader["nombre_comercial"]?.ToString() ?? string.Empty,
                     reader["cod_tela"]?.ToString() ?? string.Empty,
                     reader["oc"]?.ToString() ?? string.Empty,
                     reader["cod_proveedor"]?.ToString() ?? string.Empty
-                );
+                ));
             }
 
-            return (string.Empty, string.Empty, string.Empty, string.Empty);
+            return results;
         }
 
         public async Task<(string codigoClaseOrden, string codigoCentroCosto)> GetCabeceraBienAsync(string ordenCompra)

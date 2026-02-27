@@ -40,34 +40,61 @@ namespace SunatGreApi.Services
 
             try
             {
-                // 1. Obtener detalles básicos desde SQL Server (usp_gre_detalle_bien)
-                var (nombreComercial, codigoTela, ordenCompra, codigoProveedor) = await _sqlRepository.GetDetalleBienAsync(primerBien.Partida);
+                bool headerPopulated = false;
 
-                // Actualizar campos de cabecera y el primer bien
-                guia.CodigoProveedor = codigoProveedor;
-                primerBien.CodigoTela = codigoTela;
-                
-                // Si la DB devolvió una orden de compra, la usamos
-                if (!string.IsNullOrWhiteSpace(ordenCompra))
+                foreach (var bien in guia.Bienes.OrderBy(b => b.NumOrden))
                 {
-                    guia.OrdenCompra = ordenCompra;
+                    if (string.IsNullOrWhiteSpace(bien.Partida))
+                        continue;
+
+                    // 1. Obtener lista de detalles desde SQL Server para la Partida de este bien
+                    var detalles = await _sqlRepository.GetDetalleBienListAsync(bien.Partida);
+                    
+                    if (detalles == null || detalles.Count == 0)
+                        continue;
+
+                    // 2. Buscar coincidencia: 15 primeros caracteres de nombreComercial vs bien.DesBien
+                    var match = detalles.FirstOrDefault(d => 
+                        !string.IsNullOrEmpty(d.nombreComercial) && 
+                        !string.IsNullOrEmpty(bien.DesBien) &&
+                        string.Equals(
+                            d.nombreComercial.Substring(0, Math.Min(15, d.nombreComercial.Length)).Trim(), 
+                            bien.DesBien.Substring(0, Math.Min(15, bien.DesBien.Length)).Trim(), 
+                            StringComparison.OrdinalIgnoreCase)
+                    );
+
+                    if (match != default)
+                    {
+                        // Enriquecer el bien individual
+                        bien.CodigoTela = match.codigoTela;
+
+                        // Alimentar cabecera solo con el primer match exitoso encontrado
+                        if (!headerPopulated)
+                        {
+                            guia.CodigoProveedor = match.codigoProveedor;
+                            guia.OrdenCompra = match.ordenCompra;
+                            headerPopulated = true;
+                        }
+                    }
                 }
-                
-                // Fallback: Si no hay OrdenCompra desde la DB, usamos SunatHelper sobre Guia.Nota
+
+                // Fact: Si tras procesar todos los bienes no tenemos OC, intentamos SunatHelper (Fallback)
                 if (string.IsNullOrWhiteSpace(guia.OrdenCompra) && !string.IsNullOrWhiteSpace(guia.Nota))
                 {
                     guia.OrdenCompra = SunatHelper.GetOrdenCompra(guia.Nota);
-                    _logger.LogInformation("Orden de compra obtenida mediante fallback de SunatHelper para guia {GuiaId}.", guiaId);
+                    if (!string.IsNullOrWhiteSpace(guia.OrdenCompra))
+                    {
+                        _logger.LogInformation("Orden de compra obtenida mediante fallback de SunatHelper para guia {GuiaId}.", guiaId);
+                    }
                 }
 
-                // 2. Si tenemos Orden de Compra, seguimos enriqueciendo
+                // 3. Cascada de enriquecimiento de cabecera si tenemos Orden de Compra
                 if (!string.IsNullOrWhiteSpace(guia.OrdenCompra))
                 {
                     var (codigoClaseOrden, codigoCentroCosto) = await _sqlRepository.GetCabeceraBienAsync(guia.OrdenCompra);
                     guia.CodigoClaseOrden = codigoClaseOrden;
                     guia.CodigoCentroCosto = codigoCentroCosto;
 
-                    // 3. Si tenemos Clase de Orden, obtenemos el Tipo de Movimiento
                     if (!string.IsNullOrWhiteSpace(guia.CodigoClaseOrden))
                     {
                         var tipoMovimiento = await _sqlRepository.GetMovimientoPorClaseAsync(guia.CodigoClaseOrden);
@@ -76,7 +103,7 @@ namespace SunatGreApi.Services
                 }
 
                 await _dbContext.SaveChangesAsync();
-                _logger.LogInformation("Enriquecimiento completado exitosamente para la guía {GuiaId}.", guiaId);
+                _logger.LogInformation("Enriquecimiento completado para la guía {GuiaId}.", guiaId);
                 return true;
             }
             catch (Exception ex)
