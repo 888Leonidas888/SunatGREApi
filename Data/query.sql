@@ -1,8 +1,8 @@
 --B7075,B7956
 exec usp_gre_detalle_bien 'B7075'
-exec usp_gre_detalle_bien 'B7956'
-exec usp_gre_cabecera_bien '100-185191'
-exec usp_gre_mov_x_clase '06'
+exec usp_gre_detalle_bien 'B7956' -- con la partida se obtiene el nombre comercial, el codigo de tela, la orden de compra y el codigo de proveedor
+exec usp_gre_cabecera_bien '100-185191' -- con cod de clase de orden de compra  y centro de costo
+exec usp_gre_mov_x_clase '06' -- con cod de clase de orden de compra se obtiene el movimiento
 
 
 create or alter procedure usp_gre_detalle_bien

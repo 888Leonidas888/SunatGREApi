@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SunatGreApi.Data;
 using SunatGreApi.Models;
 using SunatGreApi.Utils;
+using SunatGreApi.Services;
 
 namespace SunatGreApi.Controllers
 {
@@ -11,10 +12,12 @@ namespace SunatGreApi.Controllers
     public class GuiaController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IGuiaService _guiaService;
 
-        public GuiaController(AppDbContext context)
+        public GuiaController(AppDbContext context, IGuiaService guiaService)
         {
             _context = context;
+            _guiaService = guiaService;
         }
 
         // GET: api/v1/Guia?page=1&pageSize=10
@@ -127,6 +130,9 @@ namespace SunatGreApi.Controllers
 
             _context.Guias.Add(guia);
             await _context.SaveChangesAsync();
+
+            // Enriquecimiento de datos
+            await _guiaService.EnrichGuiaAsync(guia.Id);
 
             return CreatedAtAction(nameof(GetGuia), new { id = guia.Id }, guia);
         }
