@@ -1,11 +1,11 @@
 --B7075,B7956
-exec usp_gre_detalle_bien 'B7075'
-exec usp_gre_detalle_bien 'B7956' -- con la partida se obtiene el nombre comercial, el codigo de tela, la orden de compra y el codigo de proveedor
-exec usp_gre_cabecera_bien '100-185191' -- con cod de clase de orden de compra  y centro de costo
+exec usp_gre_enriquecer_detalle_bien 'B7075'
+exec usp_gre_enriquecer_detalle_bien 'B7956' -- con la partida se obtiene el nombre comercial, el codigo de tela, la orden de compra y el codigo de proveedor
+exec usp_gre_enriquecer_orden_compra '100-185191' -- con cod de clase de orden de compra  y centro de costo
 exec usp_gre_mov_x_clase '06' -- con cod de clase de orden de compra se obtiene el movimiento
 
 
-create or alter procedure usp_gre_detalle_bien
+create or alter procedure usp_gre_enriquecer_detalle_bien
 @cod_ordtra cod_ordtra
 as 
 begin
@@ -28,7 +28,7 @@ begin
 end;
 
 
-create or alter procedure usp_gre_cabecera_bien
+create or alter procedure usp_gre_enriquecer_orden_compra
 @orden_compra varchar(10)= null
 as
 begin
@@ -36,7 +36,9 @@ begin
 		THROW 51000, 'Ingrese la orden de compra.', 1;
 
 	select [clase_orden]=Cod_ClaOrdComp,
-		[centro_costo]=Cod_CenCost
+		[centro_costo]=Cod_CenCost,
+		[cod_proveedor]=Cod_Proveedor,
+		[estado_orden]=Cod_StaOrdComp
 	from Lg_OrdComp where Ser_OrdComp +'-'+ Cod_OrdComp =@orden_compra
 end;
 
@@ -59,11 +61,6 @@ create table gre_mov_x_clase
 
 insert into gre_mov_x_clase values('06','T21'),('77','J01'),('16','T26'),('C1','D77')
 
-
-
-BULK INSERT Lg_OrdComp
-FROM 'C:\Users\jescriba\Desktop\test\copia.bcp'
-WITH (DATAFILETYPE = 'native', TABLOCK)
 
 
 

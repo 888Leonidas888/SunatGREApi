@@ -77,32 +77,18 @@ namespace SunatGreApi.Controllers
                 Estado = dto.DesEstado,
                 FechaCarga = DateTime.Now,
                 Nota = dto.Emision.DesNota,
-                // OrdenCompra = SunatHelper.GetOrdenCompra(dto.Emision.DesNota),
+                EstadoProceso = "PENDIENTE",
+                LogProceso = "",
                 Bienes = dto.Traslado.Bien.Select(b => new GuiaBien
                 {
                     GuiaId = dto.Id,
                     NumOrden = b.NumOrden,
-                    CodTipoDocumento = b.CodTipoDocumento,
-                    DesCortaTipoDocumento = b.DesCortaTipoDocumento,
-                    NumSerie = b.NumSerie,
-                    NumDocumento = b.NumDocumento,
-                    NumItem = b.NumItem,
-                    IndBienRegulado = b.IndBienRegulado,
                     CodBien = b.CodBien,
-                    CodProductoSunat = b.CodProductoSunat,
-                    CodSubPartida = b.CodSubPartida,
-                    CodGtin = b.CodGtin,
                     DesBien = b.DesBien,
+                    NombreComercial = SunatHelper.GetNombreComercial(b.DesBien ?? string.Empty),
                     CodUniMedida = b.CodUniMedida,
                     DesUniMedida = b.DesUniMedida,
                     NumCantidad = b.NumCantidad,
-                    IndFrecuente = b.IndFrecuente,
-                    DocRelacionado = b.DocRelacionado,
-                    NumDocTransporte = b.NumDocTransporte,
-                    NumDetalle = b.NumDetalle,
-                    NumContenedor = b.NumContenedor,
-                    NumPrecinto = b.NumPrecinto,
-                    IndContenedorVacio = b.IndContenedorVacio,
                     Partida = SunatHelper.GetPartida(b.DesBien ?? string.Empty),
                     Rollos = SunatHelper.GetRollos(b.DesBien ?? string.Empty),
                     PesoBruto = SunatHelper.GetPesoBruto(b.DesBien ?? string.Empty)
@@ -139,36 +125,30 @@ namespace SunatGreApi.Controllers
 
         // PUT: api/v1/Guia/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutGuia(string id, Guia guia)
+        public async Task<IActionResult> PutGuia(string id, string estadoProceso)
         {
-            if (id != guia.Id)
+            // 1. Definir la lista de palabras permitidas
+            var estadosValidos = new[] { "PENDIENTE", "PROCESADO", "ERROR", "COMPLETADO" };
+
+            // 2. Validar (usamos ToUpper para que no importe si escriben en minúsculas)
+            if (string.IsNullOrEmpty(estadoProceso) || !estadosValidos.Contains(estadoProceso.ToUpper()))
             {
-                return BadRequest("El ID no coincide.");
+                return BadRequest(new 
+                { 
+                    Message = $"Estado no válido. Use uno de los siguientes: {string.Join(", ", estadosValidos)}" 
+                });
             }
 
-            _context.Entry(guia).State = EntityState.Modified;
-
-            // Para actualizaciones, podrías necesitar lógica más compleja para los Bienes 
-            // (borrar los anteriores y poner nuevos, o actualizar uno a uno).
-            // Por simplicidad en este flujo de "reemplazo", borramos y volvemos a insertar si se desea.
-            // Pero por ahora solo marcamos la guía como modificada.
-
-            try
+            var guia = await _context.Guias.FindAsync(id);
+            if (guia == null)
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!await _context.Guias.AnyAsync(e => e.Id == id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return NotFound();
             }
 
+            // 3. Asignar el valor (opcionalmente en mayúsculas para mantener orden)
+            guia.EstadoProceso = estadoProceso.ToUpper();
+
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 

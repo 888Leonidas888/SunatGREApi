@@ -69,8 +69,7 @@ namespace SunatGreApi.Utils
         /// <returns>El peso bruto si se encuentra, de lo contrario, 0.</returns>   
         public static double GetPesoBruto(string texto)
         {
-            // var patron = @"\bP\.Bruto\b[:\s]+([\d.]+)";
-            var patron = @"\b(?:PB|P\.?Bruto)\s*:?\s*([0-9]+(?:[.,][0-9]+)?)";
+            var patron = @"\b(?:-?PB|P.Bruto)\b\s*[\.\:]?\s*([0-9]+(?:[.,][0-9]+)?)";
             Match m = Regex.Match(texto, patron, RegexOptions.IgnoreCase);
 
             if (m.Success)
@@ -82,6 +81,16 @@ namespace SunatGreApi.Utils
                     return peso;
             }
             return 0;
+        }
+
+        /// <summary>
+        /// Obtiene el nombre comercial de una guía de remisión.
+        /// </summary>
+        /// <param name="texto">El texto de la guía de remisión.</param>
+        /// <returns>El nombre comercial si se encuentra, de lo contrario, una cadena vacía.</returns>
+        public static string GetNombreComercial(string texto){
+            string pattron = @"^.*(?=\s*Color\s*:)";
+            return GetPatron(texto, pattron);
         }
     }
 }

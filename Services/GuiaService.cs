@@ -53,15 +53,15 @@ namespace SunatGreApi.Services
                     if (detalles == null || detalles.Count == 0)
                         continue;
 
-                    // 2. Buscar coincidencia: 15 primeros caracteres de nombreComercial vs bien.DesBien
+                    // 2. Buscar coincidencia: bien.NombreComercial debe estar al inicio de d.nombreComercial
+                    var searchKey = (bien.NombreComercial ?? string.Empty).Trim();
+                    var partialSearch = searchKey.Length > 15 ? searchKey.Substring(0, 15) : searchKey;
+
                     var match = detalles.FirstOrDefault(d => 
-                        !string.IsNullOrEmpty(d.nombreComercial) && 
-                        !string.IsNullOrEmpty(bien.DesBien) &&
-                        string.Equals(
-                            d.nombreComercial.Substring(0, Math.Min(15, d.nombreComercial.Length)).Trim(), 
-                            bien.DesBien.Substring(0, Math.Min(15, bien.DesBien.Length)).Trim(), 
-                            StringComparison.OrdinalIgnoreCase)
-                    );
+                        !string.IsNullOrEmpty(partialSearch) &&
+                        d.nombreComercial != null && 
+                        d.nombreComercial.Contains(partialSearch, StringComparison.OrdinalIgnoreCase));
+
 
                     if (match != default)
                     {
@@ -71,7 +71,6 @@ namespace SunatGreApi.Services
                         // Alimentar cabecera solo con el primer match exitoso encontrado
                         if (!headerPopulated)
                         {
-                            guia.CodigoProveedor = match.codigoProveedor;
                             guia.OrdenCompra = match.ordenCompra;
                             headerPopulated = true;
                         }
@@ -91,9 +90,11 @@ namespace SunatGreApi.Services
                 // 3. Cascada de enriquecimiento de cabecera si tenemos Orden de Compra
                 if (!string.IsNullOrWhiteSpace(guia.OrdenCompra))
                 {
-                    var (codigoClaseOrden, codigoCentroCosto) = await _sqlRepository.GetCabeceraBienAsync(guia.OrdenCompra);
+                    var (codigoClaseOrden, codigoEstadoOrden, codigoCentroCosto, codigoProveedor) = await _sqlRepository.GetCabeceraBienAsync(guia.OrdenCompra);
                     guia.CodigoClaseOrden = codigoClaseOrden;
+                    guia.CodigoEstadoOrden = codigoEstadoOrden;
                     guia.CodigoCentroCosto = codigoCentroCosto;
+                    guia.CodigoProveedor = codigoProveedor;
 
                     if (!string.IsNullOrWhiteSpace(guia.CodigoClaseOrden))
                     {

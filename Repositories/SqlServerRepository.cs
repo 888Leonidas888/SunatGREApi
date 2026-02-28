@@ -12,14 +12,14 @@ namespace SunatGreApi.Repositories
             _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         }
 
-        public async Task<List<(string nombreComercial, string codigoTela, string ordenCompra, string codigoProveedor)>> GetDetalleBienListAsync(string partida)
+        public async Task<List<(string nombreComercial, string codigoTela, string ordenCompra)>> GetDetalleBienListAsync(string partida)
         {
-            var results = new List<(string, string, string, string)>();
+            var results = new List<(string, string, string)>();
 
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync();
 
-            using var command = new SqlCommand("usp_gre_detalle_bien", connection);
+            using var command = new SqlCommand("usp_gre_enriquecer_detalle_bien", connection);
             command.CommandType = CommandType.StoredProcedure;
             command.Parameters.AddWithValue("@cod_ordtra", partida);
 
@@ -29,20 +29,19 @@ namespace SunatGreApi.Repositories
                 results.Add((
                     reader["nombre_comercial"]?.ToString() ?? string.Empty,
                     reader["cod_tela"]?.ToString() ?? string.Empty,
-                    reader["oc"]?.ToString() ?? string.Empty,
-                    reader["cod_proveedor"]?.ToString() ?? string.Empty
+                    reader["oc"]?.ToString() ?? string.Empty
                 ));
             }
 
             return results;
         }
 
-        public async Task<(string codigoClaseOrden, string codigoCentroCosto)> GetCabeceraBienAsync(string ordenCompra)
+        public async Task<(string codigoClaseOrden, string codigoEstadoOrden,string codigoCentroCosto, string codigoProveedor)> GetCabeceraBienAsync(string ordenCompra)
         {
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync();
 
-            using var command = new SqlCommand("usp_gre_cabecera_bien", connection);
+            using var command = new SqlCommand("usp_gre_enriquecer_orden_compra", connection);
             command.CommandType = CommandType.StoredProcedure;
             command.Parameters.AddWithValue("@orden_compra", ordenCompra);
 
@@ -51,11 +50,13 @@ namespace SunatGreApi.Repositories
             {
                 return (
                     reader["clase_orden"]?.ToString() ?? string.Empty,
-                    reader["centro_costo"]?.ToString() ?? string.Empty
+                    reader["estado_orden"]?.ToString() ?? string.Empty,
+                    reader["centro_costo"]?.ToString() ?? string.Empty,
+                    reader["cod_proveedor"]?.ToString() ?? string.Empty
                 );
             }
 
-            return (string.Empty, string.Empty);
+            return (string.Empty, string.Empty, string.Empty, string.Empty);
         }
 
         public async Task<string> GetMovimientoPorClaseAsync(string codigoClaseOrden)
