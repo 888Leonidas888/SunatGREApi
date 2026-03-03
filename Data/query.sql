@@ -4,6 +4,13 @@ exec usp_gre_enriquecer_detalle_bien 'B7956' -- con la partida se obtiene el nom
 exec usp_gre_enriquecer_orden_compra '100-185191' -- con cod de clase de orden de compra  y centro de costo
 exec usp_gre_mov_x_clase '06' -- con cod de clase de orden de compra se obtiene el movimiento
 
+create table gre_estado (idEstado int identity(1,1) primary key, descripcion varchar(100) not null)
+create table gre_urls(idURL int identity(1,1) primary key, url varchar(255) not null,descripcion varchar(255))
+
+
+insert into gre_urls (url, descripcion) values ('http://localhost:5133','prueba')
+insert into gre_estado (descripcion) values ('PENDIENTE'),('OBSERVADO')
+
 
 create or alter procedure usp_gre_enriquecer_detalle_bien
 @cod_ordtra cod_ordtra
@@ -17,8 +24,7 @@ begin
 		[cod_tela]=isnull(a.Cod_Tela,''),
 		[oc]=case when a.Cod_Ordcomp <> '' then  isnull(a.Ser_OrdComp,'') + '-' + isnull(a.Cod_Ordcomp,'')
 				else ''
-				end,
-		[cod_proveedor]=isnull(b.Cod_Proveedor,'')
+				end
 	FROM ti_ordtra_tintoreria_items a 
 		INNER JOIN ti_ordtra_tintoreria b      
 	ON a.Cod_Ordtra          = b.Cod_Ordtra      
@@ -36,8 +42,8 @@ begin
 		THROW 51000, 'Ingrese la orden de compra.', 1;
 
 	select [clase_orden]=Cod_ClaOrdComp,
-		[centro_costo]=Cod_CenCost,
-		[cod_proveedor]=Cod_Proveedor,
+		[centro_costo]=rtrim(ltrim(Cod_CenCost)),
+		[cod_proveedor]=rtrim(ltrim(Cod_Proveedor)),
 		[estado_orden]=Cod_StaOrdComp
 	from Lg_OrdComp where Ser_OrdComp +'-'+ Cod_OrdComp =@orden_compra
 end;
@@ -53,13 +59,7 @@ begin
 	where Cod_ClaOrdComp = @Cod_ClaOrdComp
 end;
 
-create table gre_mov_x_clase 
-(
-	Cod_ClaOrdComp varchar(2) unique not null,
-	cod_tipmov varchar(3) not null
-)
 
-insert into gre_mov_x_clase values('06','T21'),('77','J01'),('16','T26'),('C1','D77')
 
 
 

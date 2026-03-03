@@ -77,7 +77,6 @@ namespace SunatGreApi.Controllers
                 Estado = dto.DesEstado,
                 FechaCarga = DateTime.Now,
                 Nota = dto.Emision.DesNota,
-                EstadoProceso = "PENDIENTE",
                 LogProceso = "",
                 Bienes = dto.Traslado.Bien.Select(b => new GuiaBien
                 {
@@ -119,6 +118,9 @@ namespace SunatGreApi.Controllers
 
             // Enriquecimiento de datos
             await _guiaService.EnrichGuiaAsync(guia.Id);
+
+            // validacion de campos
+            await _guiaService.ValidateGuiaAsync(guia.Id);
 
             return CreatedAtAction(nameof(GetGuia), new { id = guia.Id }, guia);
         }

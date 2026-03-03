@@ -69,7 +69,7 @@ namespace SunatGreApi.Utils
         /// <returns>El peso bruto si se encuentra, de lo contrario, 0.</returns>   
         public static double GetPesoBruto(string texto)
         {
-            var patron = @"\b(?:-?PB|P.Bruto)\b\s*[\.\:]?\s*([0-9]+(?:[.,][0-9]+)?)";
+            var patron = @"\s?(?:-?PB|P.Bruto)\s*[\.\:]?\s?([0-9]+(?:[.,][0-9]+)?)";
             Match m = Regex.Match(texto, patron, RegexOptions.IgnoreCase);
 
             if (m.Success)
