@@ -27,16 +27,28 @@ namespace SunatGreApi.Models
 
         public string? Receptor { get; set; }
 
-        public string? XmlPath { get; set; }
-
-        public string? ZipPath { get; set; }
-
         public string? Estado { get; set; } // Ej: ACEPTADA, RECHAZADA, etc.
 
         public DateTime FechaCarga { get; set; } = DateTime.Now;
 
-        public List<GuiaBien> Bienes { get; set; } = new();
-
         public string? Nota { get; set; } = string.Empty;
+
+        public string? EstadoProceso { get; set; } = string.Empty;
+
+        public string? LogProceso { get; set; } = string.Empty;
+
+        public string? OrdenCompra { get; set; } = string.Empty;
+
+        public string? CodigoEstadoOrden { get; set; } = string.Empty;
+
+        public string? CodigoClaseOrden { get; set; } = string.Empty;
+
+        public string? CodigoProveedor { get; set; } = string.Empty;
+
+        public string? TipoMovimiento { get; set; } = string.Empty;
+
+        public string? CodigoCentroCosto { get; set; } = string.Empty;
+
+        public List<GuiaBien> Bienes { get; set; } = new();
     }
 }

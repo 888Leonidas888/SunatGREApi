@@ -9,3 +9,4 @@ guias_sunat.db-shm
 guias_sunat.db-wal
 appsettings.Development.json
 .dev/
+appsettings.json
