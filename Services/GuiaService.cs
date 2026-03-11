@@ -75,8 +75,15 @@ namespace SunatGreApi.Services
                     }
                 }
 
-                // NO MÁS fallback desde Nota — se quitó por requerimiento
-                // Si SQL no llena OC, así se queda.
+
+                if (string.IsNullOrWhiteSpace(guia.OrdenCompra) && !string.IsNullOrWhiteSpace(guia.Nota))
+                {
+                    guia.OrdenCompra = SunatHelper.GetOrdenCompra(guia.Nota);
+                    if (!string.IsNullOrWhiteSpace(guia.OrdenCompra))
+                    {
+                        _logger.LogInformation("Orden de compra obtenida mediante fallback de SunatHelper para guia {GuiaId}.", guiaId);
+                    }
+                }
 
                 // Si tenemos OC, poblar cabecera desde SQL
                 if (!string.IsNullOrWhiteSpace(guia.OrdenCompra))
