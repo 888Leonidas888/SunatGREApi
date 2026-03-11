@@ -64,6 +64,12 @@ namespace SunatGreApi.Controllers
         [HttpPost]
         public async Task<IActionResult> PostGuia(SunatGreApi.Models.Dtos.SunatGreDto dto)
         {
+            // Validar si el estado es BAJA para omitir el procesamiento
+            if (!string.IsNullOrEmpty(dto.DesEstado) && dto.DesEstado.Equals("BAJA", StringComparison.OrdinalIgnoreCase))
+            {
+                return Ok(new { Message = "La guía tiene estado BAJA y fue omitida." });
+            }
+
             // Mapeo manual del DTO al Modelo de Base de Datos
             var guia = new Guia
             {
