@@ -20,15 +20,34 @@ namespace SunatGreApi.Controllers
             _guiaService = guiaService;
         }
 
-        // GET: api/v1/Guia?page=1&pageSize=10
+        // GET: api/v1/Guia?page=1&pageSize=10&fecha=2026-03-11&estadoProceso=PENDIENTE
         [HttpGet]
-        public async Task<IActionResult> GetGuias([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetGuias(
+            [FromQuery] DateTime? fecha = null,
+            [FromQuery] string? estadoProceso = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 100)
         {
             if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 10;
+            if (pageSize < 1) pageSize = 100;
 
-            var totalRecords = await _context.Guias.CountAsync();
-            var guias = await _context.Guias
+            var query = _context.Guias.AsQueryable();
+
+            // Filtrar por fecha si se proporciona
+            if (fecha.HasValue)
+            {
+                var fechaBusqueda = fecha.Value.Date;
+                query = query.Where(g => g.FechaEmision.Date == fechaBusqueda);
+            }
+
+            // Filtrar por estado de proceso si se proporciona
+            if (!string.IsNullOrEmpty(estadoProceso))
+            {
+                query = query.Where(g => g.EstadoProceso == estadoProceso);
+            }
+
+            var totalRecords = await query.CountAsync();
+            var guias = await query
                 .Include(g => g.Bienes)
                 .OrderByDescending(g => g.FechaEmision)
                 .Skip((page - 1) * pageSize)
