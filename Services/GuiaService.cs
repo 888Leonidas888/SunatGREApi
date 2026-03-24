@@ -56,12 +56,26 @@ namespace SunatGreApi.Services
                         continue;
 
                     var searchKey = (bien.NombreComercial ?? string.Empty).Trim();
-                    var partialSearch = searchKey.Length > 15 ? searchKey.Substring(0, 15) : searchKey;
+                    var firstWord = searchKey.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
 
                     var match = detalles.FirstOrDefault(d =>
-                        !string.IsNullOrEmpty(partialSearch) &&
+                        !string.IsNullOrEmpty(firstWord) &&
                         d.nombreComercial != null &&
-                        d.nombreComercial.Contains(partialSearch, StringComparison.OrdinalIgnoreCase));
+                        d.nombreComercial.Contains(firstWord, StringComparison.OrdinalIgnoreCase));
+
+                    // Fallback para errores de tipeo o nomenclatura (Ej. SUPLEX vs SUUPLEX)
+                    if (match == default && firstWord.Length >= 4)
+                    {
+                        match = detalles.FirstOrDefault(d =>
+                        {
+                            if (string.IsNullOrEmpty(d.nombreComercial)) return false;
+                            var dbFirstWord = d.nombreComercial.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+                            if (dbFirstWord.Length < 4) return false;
+
+                            int distance = ComputeLevenshteinDistance(firstWord.ToUpper(), dbFirstWord.ToUpper());
+                            return distance <= 2;
+                        });
+                    }
 
                     if (match != default)
                     {
@@ -130,16 +144,7 @@ namespace SunatGreApi.Services
                 return false;
             }
 
-            // 🔥 1. ORDEN DE COMPRA OBLIGATORIA (bloqueante)
-            if (string.IsNullOrWhiteSpace(guia.OrdenCompra))
-            {
-                guia.EstadoProceso = "OBSERVADO";
-                guia.LogProceso = "orden de compra no ubicada, no se puede continuar la validación";
-                await _dbContext.SaveChangesAsync();
-                return false;
-            }
-
-            // 🔥 2. PARTIDA OBLIGATORIA (bloqueante)
+            // 1. PARTIDA OBLIGATORIA (bloqueante)
             foreach (var bien in guia.Bienes)
             {
                 if (string.IsNullOrWhiteSpace(bien.Partida))
@@ -151,17 +156,25 @@ namespace SunatGreApi.Services
                 }
             }
 
-            // 🔥 3. CÓDIGO DE TELA OBLIGATORIO (bloqueante)
+            // 2. CÓDIGO DE TELA OBLIGATORIO (bloqueante)
             foreach (var bien in guia.Bienes)
             {
                 if (string.IsNullOrWhiteSpace(bien.CodigoTela))
                 {
                     guia.EstadoProceso = "OBSERVADO";
-                    guia.LogProceso =
-                        $"descripcion comercial tela no ubicado para partida {bien.Partida}";
+                    guia.LogProceso = $"descripcion comercial tela no ubicado para partida {bien.Partida}";
                     await _dbContext.SaveChangesAsync();
                     return false;
                 }
+            }
+
+            // 3. ORDEN DE COMPRA OBLIGATORIA (bloqueante)
+            if (string.IsNullOrWhiteSpace(guia.OrdenCompra))
+            {
+                guia.EstadoProceso = "OBSERVADO";
+                guia.LogProceso = "orden de compra no ubicada, no se puede continuar la validación";
+                await _dbContext.SaveChangesAsync();
+                return false;
             }
 
             // ============================================================
@@ -223,6 +236,64 @@ namespace SunatGreApi.Services
 
             await _dbContext.SaveChangesAsync();
             return !errors.Any();
+        }
+
+        // ================================================================
+        // ==============  MÉTODOS AUXILIARES Y MAPEO =====================
+        // ================================================================
+        public Guia MapToEntity(SunatGreApi.Models.Dtos.SunatGreDto dto)
+        {
+            return new Guia
+            {
+                Id = dto.Id,
+                Serie = dto.NumSerie,
+                Numero = dto.NumCpe.ToString(),
+                RucEmisor = dto.NumRuc,
+                TipoDocumento = dto.CodTipoCpe,
+                FechaEmision = DateTime.TryParse(dto.Emision.FecEmision, out var fec) ? fec : DateTime.Now,
+                Receptor = dto.Receptor?.DesNombre,
+                Estado = dto.DesEstado,
+                FechaCarga = DateTime.Now,
+                Nota = dto.Emision?.DesNota,
+                LogProceso = "",
+                Bienes = dto.Traslado?.Bien?.Select(b => new GuiaBien
+                {
+                    GuiaId = dto.Id,
+                    NumOrden = b.NumOrden,
+                    CodBien = b.CodBien,
+                    DesBien = b.DesBien,
+                    NombreComercial = SunatHelper.GetNombreComercial(b.DesBien ?? string.Empty),
+                    CodUniMedida = b.CodUniMedida,
+                    DesUniMedida = b.DesUniMedida,
+                    NumCantidad = b.NumCantidad,
+                    Partida = SunatHelper.GetPartida(b.DesBien ?? string.Empty),
+                    Rollos = SunatHelper.GetRollos(b.DesBien ?? string.Empty),
+                    PesoBruto = SunatHelper.GetPesoBruto(b.DesBien ?? string.Empty)
+                }).ToList() ?? new List<GuiaBien>()
+            };
+        }
+
+        private int ComputeLevenshteinDistance(string s, string t)
+        {
+            int n = s.Length;
+            int m = t.Length;
+            int[,] d = new int[n + 1, m + 1];
+
+            if (n == 0) return m;
+            if (m == 0) return n;
+
+            for (int i = 0; i <= n; d[i, 0] = i++) { }
+            for (int j = 0; j <= m; d[0, j] = j++) { }
+
+            for (int i = 1; i <= n; i++)
+            {
+                for (int j = 1; j <= m; j++)
+                {
+                    int cost = (t[j - 1] == s[i - 1]) ? 0 : 1;
+                    d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + cost);
+                }
+            }
+            return d[n, m];
         }
     }
 }

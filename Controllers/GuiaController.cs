@@ -20,11 +20,12 @@ namespace SunatGreApi.Controllers
             _guiaService = guiaService;
         }
 
-        // GET: api/v1/Guia?page=1&pageSize=10&fecha=2026-03-11&estadoProceso=PENDIENTE
+        // GET: api/v1/Guia?page=1&pageSize=100&fecha=2026-03-11&estadoProceso=PENDIENTE&ambiente=PRODUCCION
         [HttpGet]
         public async Task<IActionResult> GetGuias(
             [FromQuery] DateTime? fecha = null,
             [FromQuery] string? estadoProceso = null,
+            [FromQuery] string? ambiente = null,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 100)
         {
@@ -44,6 +45,22 @@ namespace SunatGreApi.Controllers
             if (!string.IsNullOrEmpty(estadoProceso))
             {
                 query = query.Where(g => g.EstadoProceso == estadoProceso);
+            }
+
+            // Filtrar por ambiente (PRODUCCION o DESARROLLO)
+            if (!string.IsNullOrEmpty(ambiente))
+            {
+                var centrosProduccion = new[] { "1040001", "1040004" };
+
+                if (ambiente.Equals("PRODUCCION", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(g => centrosProduccion.Contains(g.CodigoCentroCosto));
+                }
+                else if (ambiente.Equals("DESARROLLO", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Cualquier otro centro de costo será Desarrollo
+                    query = query.Where(g => !centrosProduccion.Contains(g.CodigoCentroCosto));
+                }
             }
 
             var totalRecords = await query.CountAsync();
@@ -89,35 +106,14 @@ namespace SunatGreApi.Controllers
                 return Ok(new { Message = "La guía tiene estado BAJA y fue omitida." });
             }
 
-            // Mapeo manual del DTO al Modelo de Base de Datos
-            var guia = new Guia
+            // Validar omitir ingresos si el detalle contiene 'TWILL'
+            if (dto.Traslado?.Bien != null && dto.Traslado.Bien.Any(b => b.DesBien != null && b.DesBien.Contains("TWILL", StringComparison.OrdinalIgnoreCase)))
             {
-                Id = dto.Id,
-                Serie = dto.NumSerie,
-                Numero = dto.NumCpe.ToString(),
-                RucEmisor = dto.NumRuc,
-                TipoDocumento = dto.CodTipoCpe,
-                FechaEmision = DateTime.TryParse(dto.Emision.FecEmision, out var fec) ? fec : DateTime.Now,
-                Receptor = dto.Receptor.DesNombre,
-                Estado = dto.DesEstado,
-                FechaCarga = DateTime.Now,
-                Nota = dto.Emision.DesNota,
-                LogProceso = "",
-                Bienes = dto.Traslado.Bien.Select(b => new GuiaBien
-                {
-                    GuiaId = dto.Id,
-                    NumOrden = b.NumOrden,
-                    CodBien = b.CodBien,
-                    DesBien = b.DesBien,
-                    NombreComercial = SunatHelper.GetNombreComercial(b.DesBien ?? string.Empty),
-                    CodUniMedida = b.CodUniMedida,
-                    DesUniMedida = b.DesUniMedida,
-                    NumCantidad = b.NumCantidad,
-                    Partida = SunatHelper.GetPartida(b.DesBien ?? string.Empty),
-                    Rollos = SunatHelper.GetRollos(b.DesBien ?? string.Empty),
-                    PesoBruto = SunatHelper.GetPesoBruto(b.DesBien ?? string.Empty)
-                }).ToList()
-            };
+                return Ok(new { Message = "La guía tiene descripción con la palabra TWILL y fue omitida." });
+            }
+
+            // Mapeo manual del DTO al Modelo de Base de Datos manejado ahora por la capa de servicio
+            var guia = _guiaService.MapToEntity(dto);
 
             // 1. Validar si ya existe por ID (GUI de SUNAT)
             var existePorId = await _context.Guias.AnyAsync(g => g.Id == guia.Id);
