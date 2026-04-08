@@ -29,17 +29,11 @@ namespace SunatGreApi.Services
                 .FirstOrDefaultAsync(g => g.Id == guiaId);
 
             if (guia == null)
-            {
-                _logger.LogWarning("Guia con ID {GuiaId} no encontrada para enriquecimiento.", guiaId);
                 return false;
-            }
 
             var primerBien = guia.Bienes.OrderBy(b => b.NumOrden).FirstOrDefault();
             if (primerBien == null || string.IsNullOrWhiteSpace(primerBien.Partida))
-            {
-                _logger.LogInformation("No se encontró Partida en el primer bien de la guía {GuiaId}. Se detiene el enriquecimiento.", guiaId);
                 return false;
-            }
 
             try
             {

@@ -9,3 +9,6 @@ guias_sunat.db-wal
 appsettings.Development.json
 .dev/
 appsettings.json
+export_sqlite_data.py
+guias_sunat.db.bak
+observaciones/

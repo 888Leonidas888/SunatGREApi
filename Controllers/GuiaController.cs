@@ -20,12 +20,12 @@ namespace SunatGreApi.Controllers
             _guiaService = guiaService;
         }
 
-        // GET: api/v1/Guia?page=1&pageSize=100&fecha=2026-03-11&estadoProceso=PENDIENTE&ambiente=PRODUCCION
+        // GET: api/v1/Guia?page=1&pageSize=100&fecha=2026-03-11&estadoProceso=PENDIENTE&etapa=PRODUCCION
         [HttpGet]
         public async Task<IActionResult> GetGuias(
             [FromQuery] DateTime? fecha = null,
             [FromQuery] string? estadoProceso = null,
-            [FromQuery] string? ambiente = null,
+            [FromQuery] string? etapa = null,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 100)
         {
@@ -47,20 +47,24 @@ namespace SunatGreApi.Controllers
                 query = query.Where(g => g.EstadoProceso == estadoProceso);
             }
 
-            // Filtrar por ambiente (PRODUCCION o DESARROLLO)
-            if (!string.IsNullOrEmpty(ambiente))
+            // Filtrar por etapa (PRODUCCION o DESARROLLO)
+            if (!string.IsNullOrEmpty(etapa))
             {
-                var centrosProduccion = new[] { "1040001", "1040004" };
-
-                if (ambiente.Equals("PRODUCCION", StringComparison.OrdinalIgnoreCase))
+                var centroCosto = new List<string>();
+                if (etapa.Equals("PRODUCCION", StringComparison.OrdinalIgnoreCase))
                 {
-                    query = query.Where(g => centrosProduccion.Contains(g.CodigoCentroCosto));
+                    centroCosto.Add("1040001");
+                    centroCosto.Add("1040004");
                 }
-                else if (ambiente.Equals("DESARROLLO", StringComparison.OrdinalIgnoreCase))
+                else if (etapa.Equals("DESARROLLO", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Cualquier otro centro de costo será Desarrollo
-                    query = query.Where(g => !centrosProduccion.Contains(g.CodigoCentroCosto));
+                    centroCosto.Add("1050001");
                 }
+                else
+                {
+                    centroCosto.Add("1050001");
+                }
+                query = query.Where(g => centroCosto.Contains(g.CodigoCentroCosto));
             }
 
             var totalRecords = await query.CountAsync();
