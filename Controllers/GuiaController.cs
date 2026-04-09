@@ -2,8 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SunatGreApi.Data;
 using SunatGreApi.Models;
-using SunatGreApi.Utils;
 using SunatGreApi.Services;
+using SunatGreApi.Utils;
+using System;
 
 namespace SunatGreApi.Controllers
 {
@@ -13,11 +14,13 @@ namespace SunatGreApi.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IGuiaService _guiaService;
+        private readonly ILogger<GuiaController> _logger;
 
-        public GuiaController(AppDbContext context, IGuiaService guiaService)
+        public GuiaController(AppDbContext context, IGuiaService guiaService, ILogger<GuiaController> logger)
         {
             _context = context;
             _guiaService = guiaService;
+            _logger = logger;
         }
 
         // GET: api/v1/Guia?page=1&pageSize=100&fecha=2026-03-11&estadoProceso=PENDIENTE&etapa=PRODUCCION
@@ -29,59 +32,68 @@ namespace SunatGreApi.Controllers
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 100)
         {
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 100;
-
-            var query = _context.Guias.AsQueryable();
-
-            // Filtrar por fecha si se proporciona
-            if (fecha.HasValue)
+            try
             {
-                var fechaBusqueda = fecha.Value.Date;
-                query = query.Where(g => g.FechaEmision.Date == fechaBusqueda);
-            }
 
-            // Filtrar por estado de proceso si se proporciona
-            if (!string.IsNullOrEmpty(estadoProceso))
-            {
-                query = query.Where(g => g.EstadoProceso == estadoProceso);
-            }
+                if (page < 1) page = 1;
+                if (pageSize < 1) pageSize = 100;
 
-            // Filtrar por etapa (PRODUCCION o DESARROLLO)
-            if (!string.IsNullOrEmpty(etapa))
-            {
-                var centroCosto = new List<string>();
-                if (etapa.Equals("PRODUCCION", StringComparison.OrdinalIgnoreCase))
+                var query = _context.Guias.AsQueryable();
+
+                // Filtrar por fecha si se proporciona
+                if (fecha.HasValue)
                 {
-                    centroCosto.Add("1040001");
-                    centroCosto.Add("1040004");
+                    var fechaBusqueda = fecha.Value.Date;
+                    query = query.Where(g => g.FechaEmision.Date == fechaBusqueda);
                 }
-                else if (etapa.Equals("DESARROLLO", StringComparison.OrdinalIgnoreCase))
+
+                // Filtrar por estado de proceso si se proporciona
+                if (!string.IsNullOrEmpty(estadoProceso))
                 {
-                    centroCosto.Add("1050001");
+                    query = query.Where(g => (g.EstadoProceso ?? string.Empty).ToUpper() == estadoProceso.ToUpper());
                 }
-                else
+
+                // Filtrar por etapa (PRODUCCION o DESARROLLO)
+                if (!string.IsNullOrEmpty(etapa))
                 {
-                    centroCosto.Add("1050001");
+                    var centroCosto = new List<string>();
+                    if (etapa.Equals("PRODUCCION", StringComparison.OrdinalIgnoreCase))
+                    {
+                        centroCosto.Add("1040001");
+                        centroCosto.Add("1040004");
+                    }
+                    else if (etapa.Equals("DESARROLLO", StringComparison.OrdinalIgnoreCase))
+                    {
+                        centroCosto.Add("1050001");
+                    }
+                    else
+                    {
+                        centroCosto.Add("1050001");
+                    }
+                    query = query.Where(g => centroCosto.Contains(g.CodigoCentroCosto ?? string.Empty));
                 }
-                query = query.Where(g => centroCosto.Contains(g.CodigoCentroCosto));
+
+                var guias = await query
+                    .Include(g => g.Bienes)
+                    .OrderByDescending(g => g.FechaEmision)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+                var totalRecords = guias.Count();
+
+                return Ok(new
+                {
+                    TotalRecords = totalRecords,
+                    Page = page,
+                    PageSize = pageSize,
+                    Data = guias
+                });
             }
-
-            var totalRecords = await query.CountAsync();
-            var guias = await query
-                .Include(g => g.Bienes)
-                .OrderByDescending(g => g.FechaEmision)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            return Ok(new
+            catch (Exception ex)
             {
-                TotalRecords = totalRecords,
-                Page = page,
-                PageSize = pageSize,
-                Data = guias
-            });
+                _logger.LogError(ex, "Error al obtener las guías.");
+                return StatusCode(500, "Ocurrió un error al procesar la solicitud.");
+            }
         }
 
         // GET: api/v1/Guia/{id}
@@ -102,7 +114,7 @@ namespace SunatGreApi.Controllers
 
         // POST: api/v1/Guia
         [HttpPost]
-        public async Task<IActionResult> PostGuia(SunatGreApi.Models.Dtos.SunatGreDto dto)
+        public async Task<IActionResult> PostGuia(Models.Dtos.SunatGreDto dto)
         {
             // Validar si el estado es BAJA para omitir el procesamiento
             if (!string.IsNullOrEmpty(dto.DesEstado) && dto.DesEstado.Equals("BAJA", StringComparison.OrdinalIgnoreCase))
@@ -127,10 +139,10 @@ namespace SunatGreApi.Controllers
             }
 
             // 2. Validar si ya existe por clave natural (Ruc-Tipo-Serie-Numero)
-            var existePorClaveNatural = await _context.Guias.AnyAsync(g => 
-                g.RucEmisor == guia.RucEmisor && 
-                g.TipoDocumento == guia.TipoDocumento && 
-                g.Serie == guia.Serie && 
+            var existePorClaveNatural = await _context.Guias.AnyAsync(g =>
+                g.RucEmisor == guia.RucEmisor &&
+                g.TipoDocumento == guia.TipoDocumento &&
+                g.Serie == guia.Serie &&
                 g.Numero == guia.Numero);
 
             if (existePorClaveNatural)
@@ -160,9 +172,9 @@ namespace SunatGreApi.Controllers
             // 2. Validar (usamos ToUpper para que no importe si escriben en minúsculas)
             if (string.IsNullOrEmpty(estadoProceso) || !estadosValidos.Contains(estadoProceso.ToUpper()))
             {
-                return BadRequest(new 
-                { 
-                    Message = $"Estado no válido. Use uno de los siguientes: {string.Join(", ", estadosValidos)}" 
+                return BadRequest(new
+                {
+                    Message = $"Estado no válido. Use uno de los siguientes: {string.Join(", ", estadosValidos)}"
                 });
             }
 

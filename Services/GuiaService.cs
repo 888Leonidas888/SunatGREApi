@@ -19,9 +19,6 @@ namespace SunatGreApi.Services
             _logger = logger;
         }
 
-        // ================================================================
-        // ==============      ENRICH (RESTORED VERSION)      =============
-        // ================================================================
         public async Task<bool> EnrichGuiaAsync(string guiaId)
         {
             var guia = await _dbContext.Guias
@@ -66,7 +63,7 @@ namespace SunatGreApi.Services
                             var dbFirstWord = d.nombreComercial.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
                             if (dbFirstWord.Length < 4) return false;
 
-                            int distance = ComputeLevenshteinDistance(firstWord.ToUpper(), dbFirstWord.ToUpper());
+                            int distance = SunatHelper.ComputeLevenshteinDistance(firstWord.ToUpper(), dbFirstWord.ToUpper());
                             return distance <= 2;
                         });
                     }
@@ -123,9 +120,6 @@ namespace SunatGreApi.Services
             }
         }
 
-        // ================================================================
-        // ==============  VALIDATE (ENUNCIADO EXACTO) ===================
-        // ================================================================
         public async Task<bool> ValidateGuiaAsync(string guiaId)
         {
             var guia = await _dbContext.Guias
@@ -144,7 +138,7 @@ namespace SunatGreApi.Services
                 if (string.IsNullOrWhiteSpace(bien.Partida))
                 {
                     guia.EstadoProceso = "OBSERVADO";
-                    guia.LogProceso = "partida no ubicada, no se puede continuar la validación";
+                    guia.LogProceso = "partida no encontrada en uno de sus items.";
                     await _dbContext.SaveChangesAsync();
                     return false;
                 }
@@ -156,7 +150,7 @@ namespace SunatGreApi.Services
                 if (string.IsNullOrWhiteSpace(bien.CodigoTela))
                 {
                     guia.EstadoProceso = "OBSERVADO";
-                    guia.LogProceso = $"descripcion comercial tela no ubicado para partida {bien.Partida}";
+                    guia.LogProceso = $"codigo de tela no encontrado en uno de sus items.";
                     await _dbContext.SaveChangesAsync();
                     return false;
                 }
@@ -170,10 +164,6 @@ namespace SunatGreApi.Services
                 await _dbContext.SaveChangesAsync();
                 return false;
             }
-
-            // ============================================================
-            //   SI LLEGA HASTA AQUÍ → YA CUMPLE LAS 3 VALIDACIONES
-            // ============================================================
 
             var errors = new List<string>();
 
@@ -190,7 +180,7 @@ namespace SunatGreApi.Services
             if (!string.IsNullOrWhiteSpace(guia.CodigoCentroCosto) &&
                 !authorizedCostCenters.Contains(guia.CodigoCentroCosto))
             {
-                errors.Add($"Centro de costo {guia.CodigoCentroCosto} no autorizado.");
+                errors.Add($"Centro de costo no autorizado.");
             }
 
             // Estado de orden
@@ -212,7 +202,7 @@ namespace SunatGreApi.Services
 
                 if (bien.PesoBruto < bien.NumCantidad)
                 {
-                    errors.Add($"Bien {bien.CodBien}: Peso bruto ({bien.PesoBruto}) debe ser igual o mayor al peso neto/cantidad ({bien.NumCantidad}).");
+                    errors.Add("Peso bruto debe ser igual o mayor al peso neto/cantidad.");
                 }
             }
 
@@ -232,27 +222,24 @@ namespace SunatGreApi.Services
             return !errors.Any();
         }
 
-        // ================================================================
-        // ==============  MÉTODOS AUXILIARES Y MAPEO =====================
-        // ================================================================
-        public Guia MapToEntity(SunatGreApi.Models.Dtos.SunatGreDto dto)
+        public Guia MapToEntity(Models.Dtos.SunatGreDto greDto)
         {
             return new Guia
             {
-                Id = dto.Id,
-                Serie = dto.NumSerie,
-                Numero = dto.NumCpe.ToString(),
-                RucEmisor = dto.NumRuc,
-                TipoDocumento = dto.CodTipoCpe,
-                FechaEmision = DateTime.TryParse(dto.Emision.FecEmision, out var fec) ? fec : DateTime.Now,
-                Receptor = dto.Receptor?.DesNombre,
-                Estado = dto.DesEstado,
+                Id = greDto.Id,
+                Serie = greDto.NumSerie,
+                Numero = greDto.NumCpe.ToString(),
+                RucEmisor = greDto.NumRuc,
+                TipoDocumento = greDto.CodTipoCpe,
+                FechaEmision = DateTime.TryParse(greDto.Emision.FecEmision, out var fec) ? fec : DateTime.Now,
+                Receptor = greDto.Receptor?.DesNombre,
+                Estado = greDto.DesEstado,
                 FechaCarga = DateTime.Now,
-                Nota = dto.Emision?.DesNota,
+                Nota = greDto.Emision?.DesNota,
                 LogProceso = "",
-                Bienes = dto.Traslado?.Bien?.Select(b => new GuiaBien
+                Bienes = greDto.Traslado?.Bien?.Select(b => new GuiaBien
                 {
-                    GuiaId = dto.Id,
+                    GuiaId = greDto.Id,
                     NumOrden = b.NumOrden,
                     CodBien = b.CodBien,
                     DesBien = b.DesBien,
@@ -265,29 +252,6 @@ namespace SunatGreApi.Services
                     PesoBruto = SunatHelper.GetPesoBruto(b.DesBien ?? string.Empty)
                 }).ToList() ?? new List<GuiaBien>()
             };
-        }
-
-        private int ComputeLevenshteinDistance(string s, string t)
-        {
-            int n = s.Length;
-            int m = t.Length;
-            int[,] d = new int[n + 1, m + 1];
-
-            if (n == 0) return m;
-            if (m == 0) return n;
-
-            for (int i = 0; i <= n; d[i, 0] = i++) { }
-            for (int j = 0; j <= m; d[0, j] = j++) { }
-
-            for (int i = 1; i <= n; i++)
-            {
-                for (int j = 1; j <= m; j++)
-                {
-                    int cost = (t[j - 1] == s[i - 1]) ? 0 : 1;
-                    d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + cost);
-                }
-            }
-            return d[n, m];
         }
     }
 }
