@@ -54,10 +54,11 @@ gh repo view
 ```
 
 ## Guidelines for Agents
-- Always check `gh auth status` if you suspect authentication issues.
-- Use descriptive titles and bodies for PRs and Issues.
-- When creating a PR, prefer using `--title` and `--body` flags to avoid interactive prompts.
-- To push a new branch and create a PR in one flow:
+- **Branching Rule:** ALWAYS start new feature branches from a clean and updated `main` branch.
   ```powershell
-  git push -u origin <branch-name>; gh pr create --fill
+  git checkout main; git pull origin main; git checkout -b feat/your-feature-name
   ```
+- **PR Workflow:** When a PR is created, wait for the CI (GitHub Actions) to pass (Build/Test) before requesting a human review.
+- **Descriptive PRs:** Use `--title` and `--body` flags to explain the "why" of the changes.
+- **Authentication:** Always check `gh auth status` if you suspect authentication issues.
+- **Atomic Commits:** Prefer small, focused commits over large, monolithic ones.
