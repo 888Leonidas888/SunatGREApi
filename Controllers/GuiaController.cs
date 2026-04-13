@@ -1,198 +1,114 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using SunatGreApi.Data;
-using SunatGreApi.Models;
-using SunatGreApi.Utils;
+using SunatGreApi.Models.Dtos;
 using SunatGreApi.Services;
 
 namespace SunatGreApi.Controllers
 {
+    /// <summary>
+    /// Controlador para la gestión de Guías de Remisión Electrónica.
+    /// </summary>
     [ApiController]
     [Route("api/v1/[controller]")]
     public class GuiaController : ControllerBase
     {
-        private readonly AppDbContext _context;
         private readonly IGuiaService _guiaService;
+        private readonly ILogger<GuiaController> _logger;
 
-        public GuiaController(AppDbContext context, IGuiaService guiaService)
+        public GuiaController(IGuiaService guiaService, ILogger<GuiaController> logger)
         {
-            _context = context;
             _guiaService = guiaService;
+            _logger = logger;
         }
 
-        // GET: api/v1/Guia?page=1&pageSize=10&fecha=2026-03-11&estadoProceso=PENDIENTE
+        /// <summary>
+        /// Obtiene una lista paginada de guías con filtros opcionales.
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetGuias(
             [FromQuery] DateTime? fecha = null,
             [FromQuery] string? estadoProceso = null,
+            [FromQuery] string? etapa = null,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 100)
         {
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 100;
-
-            var query = _context.Guias.AsQueryable();
-
-            // Filtrar por fecha si se proporciona
-            if (fecha.HasValue)
+            try
             {
-                var fechaBusqueda = fecha.Value.Date;
-                query = query.Where(g => g.FechaEmision.Date == fechaBusqueda);
+                var result = await _guiaService.GetPagedGuiasAsync(fecha, estadoProceso, etapa, page, pageSize);
+                return Ok(new
+                {
+                    TotalRecords = result.TotalRecords,
+                    Page = page,
+                    PageSize = pageSize,
+                    Data = result.Data
+                });
             }
-
-            // Filtrar por estado de proceso si se proporciona
-            if (!string.IsNullOrEmpty(estadoProceso))
+            catch (Exception ex)
             {
-                query = query.Where(g => g.EstadoProceso == estadoProceso);
+                _logger.LogError(ex, "Error al obtener guías.");
+                return StatusCode(500, "Error interno del servidor.");
             }
-
-            var totalRecords = await query.CountAsync();
-            var guias = await query
-                .Include(g => g.Bienes)
-                .OrderByDescending(g => g.FechaEmision)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            return Ok(new
-            {
-                TotalRecords = totalRecords,
-                Page = page,
-                PageSize = pageSize,
-                Data = guias
-            });
         }
 
-        // GET: api/v1/Guia/{id}
+        /// <summary>
+        /// Obtiene el detalle de una guía por su identificador.
+        /// </summary>
         [HttpGet("{id}")]
         public async Task<IActionResult> GetGuia(string id)
         {
-            var guia = await _context.Guias
-                .Include(g => g.Bienes)
-                .FirstOrDefaultAsync(g => g.Id == id);
-
-            if (guia == null)
-            {
-                return NotFound();
-            }
-
-            return Ok(guia);
+            var guia = await _guiaService.GetGuiaByIdAsync(id);
+            return guia == null ? NotFound() : Ok(guia);
         }
 
-        // POST: api/v1/Guia
+        /// <summary>
+        /// Registra y procesa una nueva guía de SUNAT.
+        /// </summary>
         [HttpPost]
-        public async Task<IActionResult> PostGuia(SunatGreApi.Models.Dtos.SunatGreDto dto)
+        public async Task<IActionResult> PostGuia(SunatGreDto dto)
         {
-            // Validar si el estado es BAJA para omitir el procesamiento
-            if (!string.IsNullOrEmpty(dto.DesEstado) && dto.DesEstado.Equals("BAJA", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                return Ok(new { Message = "La guía tiene estado BAJA y fue omitida." });
-            }
-
-            // Mapeo manual del DTO al Modelo de Base de Datos
-            var guia = new Guia
-            {
-                Id = dto.Id,
-                Serie = dto.NumSerie,
-                Numero = dto.NumCpe.ToString(),
-                RucEmisor = dto.NumRuc,
-                TipoDocumento = dto.CodTipoCpe,
-                FechaEmision = DateTime.TryParse(dto.Emision.FecEmision, out var fec) ? fec : DateTime.Now,
-                Receptor = dto.Receptor.DesNombre,
-                Estado = dto.DesEstado,
-                FechaCarga = DateTime.Now,
-                Nota = dto.Emision.DesNota,
-                LogProceso = "",
-                Bienes = dto.Traslado.Bien.Select(b => new GuiaBien
+                var guia = await _guiaService.ProcessAndRegisterGuiaAsync(dto);
+                if (guia == null)
                 {
-                    GuiaId = dto.Id,
-                    NumOrden = b.NumOrden,
-                    CodBien = b.CodBien,
-                    DesBien = b.DesBien,
-                    NombreComercial = SunatHelper.GetNombreComercial(b.DesBien ?? string.Empty),
-                    CodUniMedida = b.CodUniMedida,
-                    DesUniMedida = b.DesUniMedida,
-                    NumCantidad = b.NumCantidad,
-                    Partida = SunatHelper.GetPartida(b.DesBien ?? string.Empty),
-                    Rollos = SunatHelper.GetRollos(b.DesBien ?? string.Empty),
-                    PesoBruto = SunatHelper.GetPesoBruto(b.DesBien ?? string.Empty)
-                }).ToList()
-            };
+                    return Ok(new { Message = "La guía fue omitida por reglas de negocio." });
+                }
 
-            // 1. Validar si ya existe por ID (GUI de SUNAT)
-            var existePorId = await _context.Guias.AnyAsync(g => g.Id == guia.Id);
-            if (existePorId)
-            {
-                return Conflict(new { Message = $"La guía con el ID {guia.Id} ya está registrada." });
+                return CreatedAtAction(nameof(GetGuia), new { id = guia.Id }, guia);
             }
-
-            // 2. Validar si ya existe por clave natural (Ruc-Tipo-Serie-Numero)
-            var existePorClaveNatural = await _context.Guias.AnyAsync(g => 
-                g.RucEmisor == guia.RucEmisor && 
-                g.TipoDocumento == guia.TipoDocumento && 
-                g.Serie == guia.Serie && 
-                g.Numero == guia.Numero);
-
-            if (existePorClaveNatural)
+            catch (InvalidOperationException ex)
             {
-                return Conflict(new { Message = "Ya existe una guía registrada con el mismo RUC, Tipo, Serie y Número." });
+                return Conflict(new { Message = ex.Message });
             }
-
-            _context.Guias.Add(guia);
-            await _context.SaveChangesAsync();
-
-            // Enriquecimiento de datos
-            await _guiaService.EnrichGuiaAsync(guia.Id);
-
-            // validacion de campos
-            await _guiaService.ValidateGuiaAsync(guia.Id);
-
-            return CreatedAtAction(nameof(GetGuia), new { id = guia.Id }, guia);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al registrar guía.");
+                return StatusCode(500, "Error al procesar la guía.");
+            }
         }
 
-        // PUT: api/v1/Guia/{id}
+        /// <summary>
+        /// Actualiza el estado de proceso de una guía específica.
+        /// </summary>
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutGuia(string id, string estadoProceso)
+        public async Task<IActionResult> PutGuia(string id, [FromQuery] string estadoProceso)
         {
-            // 1. Definir la lista de palabras permitidas
-            var estadosValidos = new[] { "PENDIENTE", "PROCESADO", "ERROR", "COMPLETADO" };
-
-            // 2. Validar (usamos ToUpper para que no importe si escriben en minúsculas)
-            if (string.IsNullOrEmpty(estadoProceso) || !estadosValidos.Contains(estadoProceso.ToUpper()))
+            var success = await _guiaService.UpdateEstadoProcesoAsync(id, estadoProceso);
+            if (!success)
             {
-                return BadRequest(new 
-                { 
-                    Message = $"Estado no válido. Use uno de los siguientes: {string.Join(", ", estadosValidos)}" 
-                });
+                return BadRequest(new { Message = "Estado no válido o guía no encontrada." });
             }
 
-            var guia = await _context.Guias.FindAsync(id);
-            if (guia == null)
-            {
-                return NotFound();
-            }
-
-            // 3. Asignar el valor (opcionalmente en mayúsculas para mantener orden)
-            guia.EstadoProceso = estadoProceso.ToUpper();
-
-            await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        // DELETE: api/v1/Guia/{id}
+        /// <summary>
+        /// Elimina una guía del sistema.
+        /// </summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteGuia(string id)
         {
-            var guia = await _context.Guias.FindAsync(id);
-            if (guia == null)
-            {
-                return NotFound();
-            }
-
-            _context.Guias.Remove(guia);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            var success = await _guiaService.DeleteGuiaAsync(id);
+            return success ? NoContent() : NotFound();
         }
     }
 }

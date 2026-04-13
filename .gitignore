@@ -4,9 +4,11 @@
 *.userosscache
 *.sln.docstates
 .vs/
-guias_sunat.db
 guias_sunat.db-shm
 guias_sunat.db-wal
 appsettings.Development.json
 .dev/
 appsettings.json
+export_sqlite_data.py
+guias_sunat.db.bak
+observaciones/
